@@ -137,7 +137,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", db.AllRecords).Methods("GET")
 	r.HandleFunc("/{term}", db.AllRecordsTerm).Methods("GET")
-	r.HandleFunc("/{id}", db.FindRecord).Methods("GET")
+	r.HandleFunc("/record/{id}", db.FindRecord).Methods("GET")
 
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
