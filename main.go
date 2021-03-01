@@ -19,22 +19,58 @@ type DB struct {
 }
 
 // find all users
-func (db *DB)AllUsers(res http.ResponseWriter, req *http.Request){
-	fmt.Println("AllUsers GET")
+func (db *DB)AllRecords(res http.ResponseWriter, req *http.Request){
+	fmt.Println("AllRecords GET")
 	// create an array of users
 	var results []*bson.M
-	var user *bson.M
+	
 	// set the api header
 	res.Header().Set("content-type", "application/json")
+	res.Header().Set("Access-Control-Allow-Origin", "*")
 	// set the find options, not sure I need this
 	findOptions := options.Find()
-	// use the find command to get all
+	findOptions.SetLimit(24)
+
 	result , err := db.collection.Find(context.TODO(), bson.D{{}}, findOptions)
+	// use the find command to get all
 	if err != nil {
-		fmt.Println("AllUsers GET failed to query DB", err)
+		fmt.Println("AllRecords GET failed to query DB", err)
 	}
 	//go through the result and decode each element at a time
 	for result.Next(context.TODO()){
+		var user *bson.M
+		err := result.Decode(&user)
+        if err != nil {
+            log.Fatal(err)
+		}
+		// add to the array
+        results = append(results, user)
+	}
+	//return the array as json
+	json.NewEncoder(res).Encode(results)
+}
+
+func (db *DB)AllRecordsTerm(res http.ResponseWriter, req *http.Request){
+	fmt.Println("AllRecordsTerm GET")
+	// create an array of users
+	var results []*bson.M
+	
+	// set the api header
+	res.Header().Set("content-type", "application/json")
+	res.Header().Set("Access-Control-Allow-Origin", "*")
+	// set the find options, not sure I need this
+	params := mux.Vars(req)
+	findOptions := options.Find()
+	findOptions.SetLimit(24)
+
+	result, err := db.collection.Find(context.TODO(), bson.M{"$text": bson.M{"$search": params["term"]}}, findOptions)
+	// use the find command to get all
+	if err != nil {
+		fmt.Println("AllRecordsTerm GET failed to query DB", err)
+	}
+	//go through the result and decode each element at a time
+	for result.Next(context.TODO()){
+		var user *bson.M
 		err := result.Decode(&user)
         if err != nil {
             log.Fatal(err)
@@ -47,8 +83,8 @@ func (db *DB)AllUsers(res http.ResponseWriter, req *http.Request){
 }
 
 // find a single user
-func (db *DB)FindUser(res http.ResponseWriter, req *http.Request){
-	fmt.Println("FindUser GET")
+func (db *DB)FindRecord(res http.ResponseWriter, req *http.Request){
+	fmt.Println("FindRecord GET")
 	var user bson.M
 	params := mux.Vars(req)
 	objectId, _ := primitive.ObjectIDFromHex(params["id"])
@@ -99,8 +135,9 @@ func main() {
 
 	// Controller for endpoints
 	r := mux.NewRouter()
-	r.HandleFunc("/", db.AllUsers).Methods("GET")
-	r.HandleFunc("/{id}", db.FindUser).Methods("GET")
+	r.HandleFunc("/", db.AllRecords).Methods("GET")
+	r.HandleFunc("/{term}", db.AllRecordsTerm).Methods("GET")
+	r.HandleFunc("/{id}", db.FindRecord).Methods("GET")
 
 
 	if err := http.ListenAndServe(":8080", r); err != nil {
