@@ -147,8 +147,8 @@ func main() {
 
 	// Controller for endpoints
 	r := mux.NewRouter()
-	r.HandleFunc("/{page:[0-9]+}", db.AllRecords).Methods("GET")
-	r.HandleFunc("/{term}/{page}", db.AllRecordsTerm).Methods("GET")
+	r.HandleFunc("/records/{page:[0-9]+}", db.AllRecords).Methods("GET")
+	r.HandleFunc("/records/{term}/{page}", db.AllRecordsTerm).Methods("GET")
 	r.HandleFunc("/record/{id}", db.FindRecord).Methods("GET")
 
 
