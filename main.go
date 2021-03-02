@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"context"
 	"encoding/json"
+	"strconv"
 
+	. "github.com/gobeam/mongo-go-pagination"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -16,6 +18,7 @@ import (
 
 type DB struct {
 	collection *mongo.Collection
+	paged_collection PagingQuery
 }
 
 // find all users
@@ -28,24 +31,32 @@ func (db *DB)AllRecords(res http.ResponseWriter, req *http.Request){
 	res.Header().Set("content-type", "application/json")
 	res.Header().Set("Access-Control-Allow-Origin", "*")
 	// set the find options, not sure I need this
-	findOptions := options.Find()
-	findOptions.SetLimit(24)
+	
 
-	result , err := db.collection.Find(context.TODO(), bson.D{{}}, findOptions)
+	params := mux.Vars(req)
+	page, err := strconv.ParseInt(params["page"], 10, 64)
+	if err != nil{
+		fmt.Println("AllRecords GET failed to parse params", err)
+	}
+	var limit int64 = 24
+	filter := bson.M{}
+	result , err := db.paged_collection.Limit(limit).Page(page).Filter(filter).Find()
 	// use the find command to get all
 	if err != nil {
 		fmt.Println("AllRecords GET failed to query DB", err)
 	}
 	//go through the result and decode each element at a time
-	for result.Next(context.TODO()){
-		var user *bson.M
-		err := result.Decode(&user)
-        if err != nil {
-            log.Fatal(err)
+	for _, raw := range result.Data {
+		var elem *bson.M
+		if marshallErr := bson.Unmarshal(raw, &elem); marshallErr == nil {
+			results = append(results, elem)
 		}
-		// add to the array
-        results = append(results, user)
+
 	}
+
+
+
+
 	//return the array as json
 	json.NewEncoder(res).Encode(results)
 }
@@ -123,7 +134,8 @@ func main() {
 	// set the collection and database
 	collection := client.Database("destch").Collection("records")
 	// you can now update the global db with collection
-	db := &DB{collection: collection }
+	col := New(collection)
+	db := &DB{collection: collection, paged_collection: col }
 	
 
     
@@ -135,8 +147,8 @@ func main() {
 
 	// Controller for endpoints
 	r := mux.NewRouter()
-	r.HandleFunc("/", db.AllRecords).Methods("GET")
-	r.HandleFunc("/{term}", db.AllRecordsTerm).Methods("GET")
+	r.HandleFunc("/{page:[0-9]+}", db.AllRecords).Methods("GET")
+	r.HandleFunc("/{term}/{page}", db.AllRecordsTerm).Methods("GET")
 	r.HandleFunc("/record/{id}", db.FindRecord).Methods("GET")
 
 
